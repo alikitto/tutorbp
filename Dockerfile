@@ -1,10 +1,13 @@
 FROM debian:stable-slim
 
-# Ставим все нужные пакеты
 RUN apt-get update && apt-get install -y \
     default-mysql-client \
     curl \
     gzip \
+    unzip \
+    python3 \
+    python3-pip \
+    && pip3 install awscli \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
