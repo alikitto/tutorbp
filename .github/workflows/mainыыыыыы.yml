@@ -1,0 +1,51 @@
+# Имя вашего workflow, которое будет отображаться в GitHub Actions
+name: MySQL Backup to Cloudflare R2
+
+# Триггеры для запуска: по расписанию и вручную
+on:
+  schedule:
+    # Запускается каждый день в 23:00 UTC (03:00 по времени Баку)
+    - cron: "0 23 * * *"
+  workflow_dispatch: # Позволяет запускать workflow вручную из интерфейса GitHub
+
+jobs:
+  backup:
+    # Задание будет выполняться на последней версии Ubuntu
+    runs-on: ubuntu-latest
+
+    steps:
+      # Шаг 1: Установка необходимых утилит (MySQL клиент и gzip)
+      - name: Install MySQL Client and Gzip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client gzip
+
+      # Шаг 2: Создание дампа базы данных и загрузка в Cloudflare R2
+      - name: Dump MySQL Database and Upload to R2
+        # Устанавливаем переменные окружения для AWS CLI.
+        # CLI автоматически использует их для аутентификации.
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          # Проверяем, что ID аккаунта R2 не пустой
+          if [ -z "${{ secrets.R2_ACCOUNT_ID }}" ]; then
+            echo "Ошибка: Секрет R2_ACCOUNT_ID не задан!"
+            exit 1
+          fi
+
+          # Генерируем имя файла с текущей датой и временем
+          FILENAME="db_backup_$(date +'%Y-%m-%d_%H-%M-%S').sql.gz"
+          
+          echo ">>> Создание дампа базы данных в файл $FILENAME"
+          mysqldump -h ${{ secrets.DB_HOST }} \
+                    -P ${{ secrets.DB_PORT }} \
+                    -u${{ secrets.DB_USER }} \
+                    -p"${{ secrets.DB_PASS }}" \
+                    ${{ secrets.DB_NAME }} | gzip > $FILENAME
+
+          echo ">>> Загрузка файла в Cloudflare R2..."
+          aws s3 cp $FILENAME s3://${{ secrets.S3_BUCKET }}/$FILENAME \
+            --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+
+          echo ">>> Резервное копирование успешно завершено!"
