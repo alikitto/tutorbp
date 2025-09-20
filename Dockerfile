@@ -1,14 +1,18 @@
 FROM debian:stable-slim
 
+# Установим только mysql-client, curl, gzip, unzip
 RUN apt-get update && apt-get install -y \
     default-mysql-client \
     curl \
     gzip \
     unzip \
-    python3 \
-    python3-pip \
-    && pip3 install awscli \
     && rm -rf /var/lib/apt/lists/*
+
+# Ставим AWS CLI v2 напрямую (без pip)
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install \
+    && rm -rf awscliv2.zip aws
 
 WORKDIR /app
 
