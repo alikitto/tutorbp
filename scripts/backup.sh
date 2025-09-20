@@ -6,7 +6,13 @@ echo ">>> Starting database backup..."
 FILENAME="db_backup_$(date +'%Y-%m-%d_%H-%M-%S').sql.gz"
 FILEPATH="/tmp/$FILENAME"
 
-mysqldump -u"$DB_USER" -p"$DB_PASS" -h"$DB_HOST" -P"$DB_PORT" "$DB_NAME" | gzip > "$FILEPATH"
+# Более безопасный и быстрый дамп (без блокировок InnoDB)
+mysqldump \
+  --single-transaction \
+  --quick \
+  --default-character-set=utf8mb4 \
+  -u"$DB_USER" -p"$DB_PASS" -h"$DB_HOST" -P"$DB_PORT" "$DB_NAME" \
+  | gzip > "$FILEPATH"
 
 echo ">>> Backup created and compressed at $FILEPATH"
 
@@ -23,7 +29,7 @@ curl --fail --silent --show-error \
   "personalizations": [{"to": [{"email": "$TO_EMAIL"}]}],
   "from": {"email": "info@alasgarov.az", "name": "CRM Backups"},
   "subject": "Ежедневный бэкап базы данных $DB_NAME",
-  "content": [{"type": "text/plain", "value": "Во вложении находится автоматический бэкап базы данных '$DB_NAME' от $(date +'%Y-%m-%d %H:%M:%S')."}],
+  "content": [{"type": "text/plain", "value": "Бэкап $DB_NAME от $(date +'%Y-%m-%d %H:%M:%S')."}],
   "attachments": [{"content": "$CONTENT", "filename": "$FILENAME", "type": "application/gzip", "disposition": "attachment"}]
 }
 EOF
