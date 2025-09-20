@@ -6,34 +6,13 @@ echo ">>> Starting database backup..."
 FILENAME="db_backup_$(date +'%Y-%m-%d_%H-%M-%S').sql.gz"
 FILEPATH="/tmp/$FILENAME"
 
-# Более безопасный и быстрый дамп (без блокировок InnoDB)
-mysqldump \
-  --single-transaction \
-  --quick \
-  --default-character-set=utf8mb4 \
-  -u"$DB_USER" -p"$DB_PASS" -h"$DB_HOST" -P"$DB_PORT" "$DB_NAME" \
+# Делаем дамп
+mysqldump -u"$DB_USER" -p"$DB_PASS" -h"$DB_HOST" -P"$DB_PORT" "$DB_NAME" \
   | gzip > "$FILEPATH"
 
-echo ">>> Backup created and compressed at $FILEPATH"
+echo ">>> Uploading to Cloudflare R2..."
+aws s3 cp "$FILEPATH" s3://$S3_BUCKET/$FILENAME \
+  --endpoint-url https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com
 
-CONTENT=$(base64 < "$FILEPATH")
-
-echo ">>> Sending email via SendGrid..."
-curl --fail --silent --show-error \
-  --request POST \
-  --url https://api.sendgrid.com/v3/mail/send \
-  --header "Authorization: Bearer $SENDGRID_API_KEY" \
-  --header 'Content-Type: application/json' \
-  --data @- <<EOF
-{
-  "personalizations": [{"to": [{"email": "$TO_EMAIL"}]}],
-  "from": {"email": "info@alasgarov.az", "name": "CRM Backups"},
-  "subject": "Ежедневный бэкап базы данных $DB_NAME",
-  "content": [{"type": "text/plain", "value": "Бэкап $DB_NAME от $(date +'%Y-%m-%d %H:%M:%S')."}],
-  "attachments": [{"content": "$CONTENT", "filename": "$FILENAME", "type": "application/gzip", "disposition": "attachment"}]
-}
-EOF
-
-echo ">>> Email sent successfully."
 rm "$FILEPATH"
-echo ">>> Cleanup complete. Backup process finished."
+echo ">>> Backup uploaded successfully to R2 bucket $S3_BUCKET"
