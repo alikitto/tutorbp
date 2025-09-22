@@ -2,7 +2,7 @@ name: MySQL Backup to Cloudflare R2
 
 on:
   schedule:
-    - cron: "0 0 * * *"   # каждый день в 00:00 UTC
+    - cron: "0 20 * * *"
   workflow_dispatch:       # запуск вручную из вкладки Actions
 
 jobs:
